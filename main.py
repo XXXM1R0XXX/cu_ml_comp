@@ -17,14 +17,14 @@ def _():
 
 @app.cell
 def _(pd):
-    train = pd.read_parquet('/Users/m1r0/Downloads/data/train.parquet', engine='fastparquet')
+    train = pd.read_parquet('data/train.parquet', engine='fastparquet')
     train
     return (train,)
 
 
 @app.cell
 def _(pd):
-    test = pd.read_parquet('/Users/m1r0/Downloads/data/test.parquet', engine='fastparquet')
+    test = pd.read_parquet('data/test.parquet', engine='fastparquet')
     test
     return (test,)
 
@@ -136,7 +136,7 @@ def _(CatBoostClassifier, study, train_pool, val_pool):
 
 @app.cell
 def _(pd):
-    ss_sub = pd.read_csv('/Users/m1r0/Downloads/data/sample_submission.csv')
+    ss_sub = pd.read_csv('data/sample_submission.csv')
     return (ss_sub,)
 
 
