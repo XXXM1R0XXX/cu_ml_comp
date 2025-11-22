@@ -72,69 +72,32 @@ def _(CatBoostClassifier, train_pool, val_pool):
             "eval_metric": "AUC",
             "task_type": "GPU",
             "verbose": False,
-        
-            "learning_rate": trial.suggest_float("learning_rate", 0.001, 0.3, log=True),
-            "iterations": trial.suggest_int("iterations", 500, 3000),
-        
-            "depth": trial.suggest_int("depth", 3, 12),
-            "grow_policy": trial.suggest_categorical(
-                "grow_policy", ["SymmetricTree", "Depthwise", "Lossguide"]
-            ),
-        
-            "l2_leaf_reg": trial.suggest_float("l2_leaf_reg", 1e-9, 15.0, log=True),
-            "model_size_reg": trial.suggest_float("model_size_reg", 0.0, 1.0),
-            "random_strength": trial.suggest_float("random_strength", 1e-9, 15.0, log=True),
-        
+            "iterations": trial.suggest_int('iterations', 1000, 2000),
+            "objective": trial.suggest_categorical("objective", ["Logloss", "CrossEntropy"]),
+            "colsample_bylevel": trial.suggest_float("colsample_bylevel", 0.01, 0.1, log=True),
+            "depth": trial.suggest_int("depth", 1, 12),
+            "boosting_type": trial.suggest_categorical("boosting_type", ["Ordered", "Plain"]),
             "bootstrap_type": trial.suggest_categorical(
                 "bootstrap_type", ["Bayesian", "Bernoulli", "MVS"]
             ),
-        
-            "border_count": trial.suggest_int("border_count", 32, 255),
-        
-            "leaf_estimation_method": trial.suggest_categorical(
-                "leaf_estimation_method", ["Newton", "Gradient"]
-            ),
-            "leaf_estimation_iterations": trial.suggest_int("leaf_estimation_iterations", 1, 15),
-        
-            "score_function": trial.suggest_categorical(
-                "score_function", ["Cosine", "L2", "NewtonCosine", "NewtonL2"]
-            ),
         }
-    
+
         if param["bootstrap_type"] == "Bayesian":
-            param["bagging_temperature"] = trial.suggest_float("bagging_temperature", 0.0, 15.0)
+            param["bagging_temperature"] = trial.suggest_float("bagging_temperature", 0, 20)
         elif param["bootstrap_type"] == "Bernoulli":
-            param["subsample"] = trial.suggest_float("subsample", 0.4, 1.0)
-    
-        if param["grow_policy"] == "Lossguide":
-            param["max_leaves"] = trial.suggest_int("max_leaves", 16, 128)
-    
-        if param["grow_policy"] in ["Lossguide", "Depthwise"]:
-            param["min_data_in_leaf"] = trial.suggest_int("min_data_in_leaf", 1, 100)
-    
-        param["leaf_estimation_backtracking"] = trial.suggest_categorical(
-            "leaf_estimation_backtracking", ["AnyImprovement", "Armijo"]
-        )
-    
-        if param["grow_policy"] in ["Lossguide", "Depthwise"]:
-            param["boosting_type"] = "Plain"
-        else:
-            param["boosting_type"] = trial.suggest_categorical(
-                "boosting_type", ["Ordered", "Plain"]
-            )
-    
-        param["od_type"] = trial.suggest_categorical("od_type", ["IncToDec", "Iter"])
-        param["od_wait"] = trial.suggest_int("od_wait", 10, 50)
-    
+            param["subsample"] = trial.suggest_float("subsample", 0.1, 1)
+        if param["objective"] == "Logloss":
+            param["objective"] = trial.suggest_categorical("auto_class_weights", ["default", "Balanced", "SqrtBalanced"])
+
         model = CatBoostClassifier(**param)
-    
+
         model.fit(
             train_pool,
             eval_set=val_pool,
             verbose=0,
             early_stopping_rounds=100,
         )
-    
+
         return model.get_best_score()["validation"]["AUC"]
     return (objective,)
 
