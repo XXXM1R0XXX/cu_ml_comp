@@ -208,9 +208,10 @@ def _(CatBoostClassifier, FOLD_TRAIN_VAL_SPLIT, MAX_TIME_SPLITS, Pool, SEED, def
         # Calculate split points
         for split_idx in range(n_splits):
             # Progressive training: use more data as we progress
-            train_months_count = len(unique_months) - n_splits + split_idx
-            train_months = unique_months[:train_months_count]
-            val_month = unique_months[train_months_count]
+            # This simulates real-world scenario where more historical data accumulates
+            progressive_train_window_size = len(unique_months) - n_splits + split_idx
+            train_months = unique_months[:progressive_train_window_size]
+            val_month = unique_months[progressive_train_window_size]
             
             print(f"\nSplit {split_idx + 1}/{n_splits}:")
             print(f"  Training months: {train_months[0]} to {train_months[-1]} ({len(train_months)} months)")
@@ -361,13 +362,23 @@ def _(monthly_stability_results, plt):
         plt.tight_layout()
         plt.savefig('monthly_stability_analysis.png', dpi=150, bbox_inches='tight')
         print("Saved stability plots to: monthly_stability_analysis.png")
-        fig
-    return
+        return fig
+    return None
 
 
 @app.cell
 def _(CatBoostClassifier, CV_MIN_MEAN_THRESHOLD, FOLD_TRAIN_VAL_SPLIT, MAX_TIME_SPLITS, Pool, SEED, defaultdict, np, pd, train):
     """Feature importance stability analysis"""
+    
+    def safe_coefficient_of_variation(values):
+        """
+        Calculate coefficient of variation with safe division.
+        Returns 0.0 for features with near-zero mean importance.
+        """
+        mean_val = values.mean()
+        if mean_val > CV_MIN_MEAN_THRESHOLD:
+            return values.std() / mean_val
+        return 0.0
     
     def analyze_feature_stability(train_data, best_params):
         """
@@ -455,9 +466,7 @@ def _(CatBoostClassifier, CV_MIN_MEAN_THRESHOLD, FOLD_TRAIN_VAL_SPLIT, MAX_TIME_
             'feature': importance_df.columns,
             'mean_importance': importance_df.mean(),
             'std_importance': importance_df.std(),
-            'cv_importance': importance_df.apply(
-                lambda col: col.std() / col.mean() if col.mean() > CV_MIN_MEAN_THRESHOLD else 0.0, axis=0
-            ),  # Coefficient of variation with safe division
+            'cv_importance': importance_df.apply(safe_coefficient_of_variation, axis=0),
             'min_importance': importance_df.min(),
             'max_importance': importance_df.max(),
             'range_importance': importance_df.max() - importance_df.min()
@@ -538,7 +547,7 @@ def _(feature_importance_results, feature_stability_metrics, plt):
         plt.savefig('feature_stability_analysis.png', dpi=150, bbox_inches='tight')
         print("Saved feature stability plots to: feature_stability_analysis.png")
         return fig
-    return
+    return None
 
 
 @app.cell
@@ -590,7 +599,7 @@ def _(json, monthly_stability_results, feature_stability_metrics):
         print("  - feature_stability_metrics.csv")
         print("  - feature_stability_analysis.png")
         print("  - stability_summary.json")
-    return
+    return None
 
 
 @app.cell
