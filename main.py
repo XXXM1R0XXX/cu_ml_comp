@@ -9,7 +9,6 @@ def _():
     from catboost import CatBoostClassifier, Pool
     import pandas as pd
     import optuna
-    from optuna.integration import CatBoostPruningCallback
     from sklearn.model_selection import train_test_split, TimeSeriesSplit
     from sklearn.metrics import roc_auc_score
     from dataclasses import dataclass
@@ -21,7 +20,7 @@ def _():
         test_path: str = "data/test.parquet"
 
     args = parse(Args)
-    return CatBoostClassifier, CatBoostPruningCallback, Pool, args, optuna, pd
+    return CatBoostClassifier, Pool, args, optuna, pd
 
 
 @app.cell
@@ -66,13 +65,13 @@ def _(Pool, test, train_df, val_df):
 
 
 @app.cell
-def _(CatBoostClassifier, CatBoostPruningCallback, train_pool, val_pool):
+def _(CatBoostClassifier, train_pool, val_pool):
     def objective(trial):
         # Определение пространства гиперпараметров
         param = {
             "objective": "Logloss",
             "eval_metric": "AUC",
-            "iterations": 2000,  # Ставим больше, сработает early_stopping или pruning
+            "iterations": 2000,  # Ставим больше, сработает early_stopping
             "learning_rate": trial.suggest_float("learning_rate", 0.005, 0.2, log=True),
             "depth": trial.suggest_int("depth", 4, 10),
             "l2_leaf_reg": trial.suggest_float("l2_leaf_reg", 1e-8, 10.0, log=True),
@@ -86,7 +85,7 @@ def _(CatBoostClassifier, CatBoostPruningCallback, train_pool, val_pool):
             "od_wait": 50,
             "allow_writing_files": False,
             "verbose": False,
-            'task_type': 'GPU'
+            "task_type": "GPU",
         }
 
         # Условные параметры в зависимости от bootstrap_type
@@ -97,9 +96,6 @@ def _(CatBoostClassifier, CatBoostPruningCallback, train_pool, val_pool):
         elif param["bootstrap_type"] == "Bernoulli":
             param["subsample"] = trial.suggest_float("subsample", 0.1, 1)
 
-        # Интеграция прунинга (остановка неперспективных запусков)
-        pruning_callback = CatBoostPruningCallback(trial, "AUC")
-
         model = CatBoostClassifier(**param)
 
         model.fit(
@@ -107,11 +103,7 @@ def _(CatBoostClassifier, CatBoostPruningCallback, train_pool, val_pool):
             eval_set=val_pool,
             verbose=0,
             early_stopping_rounds=100,
-            callbacks=[pruning_callback],
         )
-
-        # Прунинг: проверяем, нужно ли прервать trial
-        pruning_callback.check_pruned()
 
         return model.get_best_score()["validation"]["AUC"]
     return (objective,)
@@ -119,9 +111,7 @@ def _(CatBoostClassifier, CatBoostPruningCallback, train_pool, val_pool):
 
 @app.cell
 def _(objective, optuna):
-    study = optuna.create_study(
-        direction="maximize", pruner=optuna.pruners.MedianPruner(n_warmup_steps=10)
-    )
+    study = optuna.create_study(direction="maximize")
 
     # n_trials - количество попыток, timeout - ограничение по времени в секундах
     study.optimize(objective, n_trials=50, timeout=600)
@@ -151,7 +141,7 @@ def _(CatBoostClassifier, study, train_pool, val_pool):
     final_model = CatBoostClassifier(**best_params)
 
     final_model.fit(train_pool, eval_set=val_pool, verbose=100, plot=False)
-    return
+    return (final_model,)
 
 
 @app.cell
@@ -161,8 +151,8 @@ def _(pd):
 
 
 @app.cell
-def _(model, ss_sub, test_pool):
-    ss_sub["a6_flg"] = model.predict_proba(test_pool)[:, 1]
+def _(final_model, ss_sub, test_pool):
+    ss_sub["a6_flg"] = final_model.predict_proba(test_pool)[:, 1]
     return
 
 
