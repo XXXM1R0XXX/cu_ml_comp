@@ -14,13 +14,11 @@ def _():
     from dataclasses import dataclass
     from simple_parsing import parse
 
-
     @dataclass
     class Args:
         train_path: str = "data/train.parquet"
         test_path: str = "data/test.parquet"
         ssub_path: str = "data/sample_submission.csv"
-
 
     args = parse(Args)
     return CatBoostClassifier, Pool, args, optuna, pd
@@ -91,7 +89,9 @@ def _(CatBoostClassifier, train_pool, val_pool):
         }
 
         if param["bootstrap_type"] == "Bayesian":
-            param["bagging_temperature"] = trial.suggest_float("bagging_temperature", 0, 20)
+            param["bagging_temperature"] = trial.suggest_float(
+                "bagging_temperature", 0, 20
+            )
         elif param["bootstrap_type"] == "Bernoulli":
             param["subsample"] = trial.suggest_float("subsample", 0.1, 1)
         if param["objective"] == "Logloss":
@@ -109,6 +109,7 @@ def _(CatBoostClassifier, train_pool, val_pool):
         )
 
         return model.get_best_score()["validation"]["AUC"]
+
     return (objective,)
 
 
