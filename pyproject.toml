@@ -1,0 +1,19 @@
+[project]
+name = "cu-scoring"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "catboost>=1.2.8",
+    "fastparquet>=2024.11.0",
+    "ipython>=8.18.1",
+    "ipywidgets>=8.1.8",
+    "marimo>=0.17.6",
+    "optuna>=4.6.0",
+    "optuna-integration[catboost]>=4.6.0",
+    "pyarrow>=21.0.0",
+    "pyzmq>=27.1.0",
+    "scikit-learn>=1.6.1",
+    "traitlets>=5.14.3",
+]
