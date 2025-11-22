@@ -62,7 +62,8 @@ def _(CatBoostClassifier, CatBoostPruningCallback, train_pool, val_pool):
             "od_type": "Iter",
             "od_wait": 50,
             "allow_writing_files": False,
-            "verbose": False
+            "verbose": False,
+            'task_type': 'GPU'
         }
 
         # Условные параметры в зависимости от bootstrap_type
