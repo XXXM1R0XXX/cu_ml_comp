@@ -360,7 +360,7 @@ def _(monthly_stability_results, plt):
 
 
 @app.cell
-def _(CatBoostClassifier, Pool, SEED, defaultdict, np, pd, train, validation_model):
+def _(CatBoostClassifier, Pool, SEED, defaultdict, np, pd, train):
     """Feature importance stability analysis"""
     
     def analyze_feature_stability(train_data, best_params):
@@ -401,7 +401,26 @@ def _(CatBoostClassifier, Pool, SEED, defaultdict, np, pd, train, validation_mod
                 timestamp=fold_train['month_dt']
             )
             
-            # Train model
+            # Create a small validation set for early stopping (use last 20% of fold)
+            val_split_idx = int(len(fold_train) * 0.8)
+            fold_train_subset = fold_train.iloc[:val_split_idx]
+            fold_val_subset = fold_train.iloc[val_split_idx:]
+            
+            fold_train_subset_pool = Pool(
+                data=fold_train_subset.drop(['a6_flg'], axis=1),
+                label=fold_train_subset['a6_flg'],
+                cat_features=['product'],
+                timestamp=fold_train_subset['month_dt']
+            )
+            
+            fold_val_subset_pool = Pool(
+                data=fold_val_subset.drop(['a6_flg'], axis=1),
+                label=fold_val_subset['a6_flg'],
+                cat_features=['product'],
+                timestamp=fold_val_subset['month_dt']
+            )
+            
+            # Train model with early stopping for consistency
             fold_params = best_params.copy()
             fold_params.update({
                 'eval_metric': 'AUC',
@@ -411,9 +430,10 @@ def _(CatBoostClassifier, Pool, SEED, defaultdict, np, pd, train, validation_mod
             })
             
             fold_model = CatBoostClassifier(**fold_params)
-            fold_model.fit(fold_train_pool, verbose=0)
+            fold_model.fit(fold_train_subset_pool, eval_set=fold_val_subset_pool, 
+                          verbose=0, early_stopping_rounds=100)
             
-            # Get feature importances
+            # Get feature importances from the trained model
             importances = fold_model.get_feature_importance()
             feature_names = fold_train.drop(['a6_flg'], axis=1).columns
             
@@ -429,7 +449,9 @@ def _(CatBoostClassifier, Pool, SEED, defaultdict, np, pd, train, validation_mod
             'feature': importance_df.columns,
             'mean_importance': importance_df.mean(),
             'std_importance': importance_df.std(),
-            'cv_importance': importance_df.std() / (importance_df.mean() + 1e-10),  # Coefficient of variation
+            'cv_importance': importance_df.apply(
+                lambda col: col.std() / col.mean() if col.mean() > 1e-6 else 0.0, axis=0
+            ),  # Coefficient of variation with safe division
             'min_importance': importance_df.min(),
             'max_importance': importance_df.max(),
             'range_importance': importance_df.max() - importance_df.min()
@@ -509,7 +531,7 @@ def _(feature_importance_results, feature_stability_metrics, plt):
         plt.tight_layout()
         plt.savefig('feature_stability_analysis.png', dpi=150, bbox_inches='tight')
         print("Saved feature stability plots to: feature_stability_analysis.png")
-        fig
+        return fig
     return
 
 
