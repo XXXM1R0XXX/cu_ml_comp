@@ -143,16 +143,16 @@ def _(SEED, objective, optuna):
 
 
 @app.cell
-def _(CatBoostClassifier, SEED, full_train_pool, study, train_pool, val_pool):
+def _(CatBoostClassifier, SEED, full_train_pool, study):
     best_params = study.best_params.copy()
 
     best_params.update({"eval_metric": "AUC", "task_type": "GPU", "random_seed": SEED})
 
-    print("Training validation model with params:", best_params)
+    # print("Training validation model with params:", best_params)
 
-    validation_model = CatBoostClassifier(**best_params)
+    # validation_model = CatBoostClassifier(**best_params)
 
-    validation_model.fit(train_pool, eval_set=val_pool, verbose=100, plot=False)
+    # validation_model.fit(train_pool, eval_set=val_pool, verbose=100, plot=False)
 
     print("Retraining on the full dataset for inference")
 
