@@ -72,7 +72,7 @@ def _(CatBoostClassifier, CatBoostPruningCallback, train_pool, val_pool):
             "od_wait": 50,
             "allow_writing_files": False,
             "verbose": False,
-            'task_type': 'GPU'
+            # 'task_type': 'GPU'
         }
 
         # Условные параметры в зависимости от bootstrap_type
@@ -85,7 +85,7 @@ def _(CatBoostClassifier, CatBoostPruningCallback, train_pool, val_pool):
         pruning_callback = CatBoostPruningCallback(trial, "AUC")
 
         model = CatBoostClassifier(**param)
-    
+
         model.fit(
             train_pool,
             eval_set=val_pool,
@@ -98,7 +98,6 @@ def _(CatBoostClassifier, CatBoostPruningCallback, train_pool, val_pool):
         pruning_callback.check_pruned()
 
         return model.get_best_score()["validation"]["AUC"]
-
     return (objective,)
 
 
@@ -120,7 +119,7 @@ def _(objective, optuna):
 @app.cell
 def _(CatBoostClassifier, study, train_pool, val_pool):
     best_params = study.best_params.copy()
-    
+
     # Добавляем статические параметры, которые не перебирали, но нужны для финального обучения
     best_params.update({
         "iterations": 2000,
