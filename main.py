@@ -14,11 +14,13 @@ def _():
     from dataclasses import dataclass
     from simple_parsing import parse
 
+
     @dataclass
     class Args:
         train_path: str = "data/train.parquet"
         test_path: str = "data/test.parquet"
         ssub_path: str = "data/sample_submission.csv"
+
 
     args = parse(Args)
     return CatBoostClassifier, Pool, args, optuna, pd
@@ -72,11 +74,17 @@ def _(CatBoostClassifier, train_pool, val_pool):
             "eval_metric": "AUC",
             "task_type": "GPU",
             "verbose": False,
-            "iterations": trial.suggest_int('iterations', 1000, 2000),
-            "objective": trial.suggest_categorical("objective", ["Logloss", "CrossEntropy"]),
-            "colsample_bylevel": trial.suggest_float("colsample_bylevel", 0.01, 0.1, log=True),
+            "iterations": trial.suggest_int("iterations", 1000, 2000),
+            "objective": trial.suggest_categorical(
+                "objective", ["Logloss", "CrossEntropy"]
+            ),
+            "colsample_bylevel": trial.suggest_float(
+                "colsample_bylevel", 0.01, 0.1, log=True
+            ),
             "depth": trial.suggest_int("depth", 1, 12),
-            "boosting_type": trial.suggest_categorical("boosting_type", ["Ordered", "Plain"]),
+            "boosting_type": trial.suggest_categorical(
+                "boosting_type", ["Ordered", "Plain"]
+            ),
             "bootstrap_type": trial.suggest_categorical(
                 "bootstrap_type", ["Bayesian", "Bernoulli", "MVS"]
             ),
@@ -87,7 +95,9 @@ def _(CatBoostClassifier, train_pool, val_pool):
         elif param["bootstrap_type"] == "Bernoulli":
             param["subsample"] = trial.suggest_float("subsample", 0.1, 1)
         if param["objective"] == "Logloss":
-            param["objective"] = trial.suggest_categorical("auto_class_weights", ["default", "Balanced", "SqrtBalanced"])
+            param["objective"] = trial.suggest_categorical(
+                "auto_class_weights", ["default", "Balanced", "SqrtBalanced"]
+            )
 
         model = CatBoostClassifier(**param)
 
@@ -117,13 +127,7 @@ def _(objective, optuna):
 def _(CatBoostClassifier, study, train_pool, val_pool):
     best_params = study.best_params.copy()
 
-    best_params.update(
-        {
-            "eval_metric": "AUC",
-            "task_type": "GPU",
-            "random_seed": 56
-        }
-    )
+    best_params.update({"eval_metric": "AUC", "task_type": "GPU", "random_seed": 56})
 
     print("Training final model with params:", best_params)
 
