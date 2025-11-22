@@ -8,23 +8,32 @@ app = marimo.App(width="full")
 def _():
     from catboost import CatBoostClassifier, Pool
     import pandas as pd
-    import optuna  # <--- Добавлено
-    from optuna.integration import CatBoostPruningCallback # <--- Добавлено для прунинга
+    import optuna
+    from optuna.integration import CatBoostPruningCallback
     from sklearn.model_selection import train_test_split, TimeSeriesSplit
     from sklearn.metrics import roc_auc_score
-    return CatBoostClassifier, CatBoostPruningCallback, Pool, optuna, pd
+    from dataclasses import dataclass
+    from simple_parsing import parse
+
+    @dataclass
+    class Args:
+        train_path: str = "data/train.parquet"
+        test_path: str = "data/test.parquet"
+
+    args = parse(Args)
+    return CatBoostClassifier, CatBoostPruningCallback, Pool, args, optuna, pd
 
 
 @app.cell
-def _(pd):
-    train = pd.read_parquet('data/train.parquet', engine='fastparquet')
+def _(args, pd):
+    train = pd.read_parquet(args.train_path, engine='fastparquet')
     train
     return (train,)
 
 
 @app.cell
-def _(pd):
-    test = pd.read_parquet('data/test.parquet', engine='fastparquet')
+def _(args, pd):
+    test = pd.read_parquet(args.test_path, engine='fastparquet')
     test
     return (test,)
 
