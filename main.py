@@ -69,32 +69,60 @@ def _(Pool, test, train_df, val_df):
 def _(CatBoostClassifier, train_pool, val_pool):
     def objective(trial):
         param = {
-            "objective": "Logloss",
             "eval_metric": "AUC",
-            "iterations": 2000,
-            "learning_rate": trial.suggest_float("learning_rate", 0.005, 0.2, log=True),
-            "depth": trial.suggest_int("depth", 4, 10),
-            "l2_leaf_reg": trial.suggest_float("l2_leaf_reg", 1e-8, 10.0, log=True),
-            "random_strength": trial.suggest_float(
-                "random_strength", 1e-8, 10.0, log=True
-            ),
-            "bootstrap_type": trial.suggest_categorical(
-                "bootstrap_type", ["Bayesian", "Bernoulli", "MVS"]
-            ),
-            "od_type": "Iter",
-            "od_wait": 50,
-            "allow_writing_files": False,
-            "verbose": False,
             "task_type": "GPU",
+            "verbose": False,
+            "random_seed": 56,
+        
+            "iterations": 2000, 
+        
+            "learning_rate": trial.suggest_float("learning_rate", 0.001, 0.3, log=True),
+        
+            "l2_leaf_reg": trial.suggest_float("l2_leaf_reg", 1e-5, 100, log=True),
+        
+            "colsample_bylevel": trial.suggest_float("colsample_bylevel", 0.05, 1.0),
+        
+            "random_strength": trial.suggest_float("random_strength", 1e-8, 20.0, log=True),
+        
+            "leaf_estimation_method": trial.suggest_categorical(
+                "leaf_estimation_method", ["Newton", "Gradient"]
+            ),
+        
+            "leaf_estimation_iterations": trial.suggest_int("leaf_estimation_iterations", 1, 20),
+        
+            "border_count": trial.suggest_int("border_count", 32, 255),
         }
 
+        param["bootstrap_type"] = trial.suggest_categorical(
+            "bootstrap_type", ["Bayesian", "Bernoulli", "MVS"]
+        )
+
         if param["bootstrap_type"] == "Bayesian":
-            param["bagging_temperature"] = trial.suggest_float(
-                "bagging_temperature", 0, 10
-            )
+            param["bagging_temperature"] = trial.suggest_float("bagging_temperature", 0, 10)
         elif param["bootstrap_type"] == "Bernoulli":
             param["subsample"] = trial.suggest_float("subsample", 0.1, 1)
 
+        param["grow_policy"] = trial.suggest_categorical(
+            "grow_policy", ["SymmetricTree", "Depthwise", "Lossguide"]
+        )
+
+        if param["grow_policy"] == "SymmetricTree":
+            param["depth"] = trial.suggest_int("depth", 3, 10)
+        
+        elif param["grow_policy"] == "Depthwise":
+            param["depth"] = trial.suggest_int("depth", 3, 10)
+            param["min_data_in_leaf"] = trial.suggest_int("min_data_in_leaf", 1, 100)
+        
+        elif param["grow_policy"] == "Lossguide":
+            param["max_leaves"] = trial.suggest_int("max_leaves", 16, 64)
+            param["min_data_in_leaf"] = trial.suggest_int("min_data_in_leaf", 1, 100)
+            param["depth"] = trial.suggest_int("depth", 3, 12) 
+
+        param["auto_class_weights"] = trial.suggest_categorical(
+            "auto_class_weights", [None, "SqrtBalanced", "Balanced"]
+        )
+
+        # Инициализация и обучение
         model = CatBoostClassifier(**param)
 
         model.fit(
@@ -104,6 +132,7 @@ def _(CatBoostClassifier, train_pool, val_pool):
             early_stopping_rounds=100,
         )
 
+        # Возвращаем лучший скор
         return model.get_best_score()["validation"]["AUC"]
     return (objective,)
 
@@ -125,12 +154,9 @@ def _(CatBoostClassifier, study, train_pool, val_pool):
 
     best_params.update(
         {
-            "iterations": 2000,
             "eval_metric": "AUC",
-            "od_type": "Iter",
-            "od_wait": 100,
-            "allow_writing_files": False,
             "task_type": "GPU",
+            "random_seed": 56
         }
     )
 
