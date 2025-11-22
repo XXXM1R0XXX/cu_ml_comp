@@ -73,12 +73,10 @@ def _(CatBoostClassifier, train_pool, val_pool):
             "task_type": "GPU",
             "verbose": False,
             "iterations": trial.suggest_int("iterations", 1000, 2000),
-            "objective": trial.suggest_categorical(
-                "objective", ["Logloss", "CrossEntropy"]
+            "loss_function": trial.suggest_categorical(
+                "loss_function", ["Logloss", "CrossEntropy"]
             ),
-            "colsample_bylevel": trial.suggest_float(
-                "colsample_bylevel", 0.01, 0.1, log=True
-            ),
+            # УДАЛЕНО: colsample_bylevel - не поддерживается на GPU
             "depth": trial.suggest_int("depth", 1, 12),
             "boosting_type": trial.suggest_categorical(
                 "boosting_type", ["Ordered", "Plain"]
@@ -86,17 +84,29 @@ def _(CatBoostClassifier, train_pool, val_pool):
             "bootstrap_type": trial.suggest_categorical(
                 "bootstrap_type", ["Bayesian", "Bernoulli", "MVS"]
             ),
+            # Основные параметры обучения
+            "learning_rate": trial.suggest_float("learning_rate", 0.001, 0.3, log=True),
+        
+            # Регуляризация
+            "l2_leaf_reg": trial.suggest_float("l2_leaf_reg", 1e-9, 15.0, log=True),
+            "random_strength": trial.suggest_float("random_strength", 1e-9, 15.0, log=True),
+        
+            # Параметры квантизации для GPU
+            "border_count": trial.suggest_int("border_count", 32, 255),
         }
 
+        # Bootstrap parameters
         if param["bootstrap_type"] == "Bayesian":
             param["bagging_temperature"] = trial.suggest_float(
                 "bagging_temperature", 0, 20
             )
         elif param["bootstrap_type"] == "Bernoulli":
             param["subsample"] = trial.suggest_float("subsample", 0.1, 1)
-        if param["objective"] == "Logloss":
-            param["objective"] = trial.suggest_categorical(
-                "auto_class_weights", ["default", "Balanced", "SqrtBalanced"]
+    
+        # ИСПРАВЛЕНО: auto_class_weights отдельно от loss_function
+        if param["loss_function"] == "Logloss":
+            param["auto_class_weights"] = trial.suggest_categorical(
+                "auto_class_weights", ["None", "Balanced", "SqrtBalanced"]
             )
 
         model = CatBoostClassifier(**param)
@@ -109,7 +119,6 @@ def _(CatBoostClassifier, train_pool, val_pool):
         )
 
         return model.get_best_score()["validation"]["AUC"]
-
     return (objective,)
 
 
