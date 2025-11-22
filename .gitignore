@@ -10,3 +10,10 @@ wheels/
 .venv
 data/*
 submission.csv
+
+# Stability analysis outputs
+monthly_stability_results.csv
+monthly_stability_analysis.png
+feature_stability_metrics.csv
+feature_stability_analysis.png
+stability_summary.json
