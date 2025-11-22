@@ -27,7 +27,13 @@ def _():
     args = parse(Args)
 
     SEED = 228
-    return CatBoostClassifier, Pool, SEED, args, optuna, pd, np, plt, json, defaultdict
+    
+    # Stability analysis configuration constants
+    MAX_TIME_SPLITS = 5  # Maximum number of time-series cross-validation splits
+    FOLD_TRAIN_VAL_SPLIT = 0.8  # Train/val split ratio within each fold
+    CV_MIN_MEAN_THRESHOLD = 1e-6  # Minimum mean importance for CV calculation
+    
+    return CatBoostClassifier, Pool, SEED, args, optuna, pd, np, plt, json, defaultdict, MAX_TIME_SPLITS, FOLD_TRAIN_VAL_SPLIT, CV_MIN_MEAN_THRESHOLD
 
 
 @app.cell
@@ -162,11 +168,11 @@ def _(CatBoostClassifier, SEED, full_train_pool, study, train_pool, val_pool):
     final_model = CatBoostClassifier(**best_params)
 
     final_model.fit(full_train_pool, verbose=100, plot=False)
-    return (final_model, validation_model)
+    return (final_model,)
 
 
 @app.cell
-def _(CatBoostClassifier, Pool, SEED, defaultdict, np, pd, roc_auc_score, train):
+def _(CatBoostClassifier, FOLD_TRAIN_VAL_SPLIT, MAX_TIME_SPLITS, Pool, SEED, defaultdict, np, pd, roc_auc_score, train):
     """Monthly stability analysis using time-based cross-validation"""
     
     def analyze_monthly_stability(train_data, best_params):
@@ -193,7 +199,7 @@ def _(CatBoostClassifier, Pool, SEED, defaultdict, np, pd, roc_auc_score, train)
         }
         
         # Use TimeSeriesSplit-like approach: train on earlier months, validate on later
-        n_splits = min(5, len(unique_months) - 1)  # At least 2 months needed
+        n_splits = min(MAX_TIME_SPLITS, len(unique_months) - 1)  # At least 2 months needed
         
         if len(unique_months) < 2:
             print("Not enough months for stability analysis")
@@ -360,7 +366,7 @@ def _(monthly_stability_results, plt):
 
 
 @app.cell
-def _(CatBoostClassifier, Pool, SEED, defaultdict, np, pd, train):
+def _(CatBoostClassifier, CV_MIN_MEAN_THRESHOLD, FOLD_TRAIN_VAL_SPLIT, MAX_TIME_SPLITS, Pool, SEED, defaultdict, np, pd, train):
     """Feature importance stability analysis"""
     
     def analyze_feature_stability(train_data, best_params):
@@ -383,7 +389,7 @@ def _(CatBoostClassifier, Pool, SEED, defaultdict, np, pd, train):
         print("\nAnalyzing feature importance across time periods...")
         
         # Split into time windows
-        n_splits = min(5, len(unique_months) - 1)
+        n_splits = min(MAX_TIME_SPLITS, len(unique_months) - 1)
         
         for split_idx in range(n_splits):
             train_months_count = len(unique_months) - n_splits + split_idx
@@ -401,8 +407,8 @@ def _(CatBoostClassifier, Pool, SEED, defaultdict, np, pd, train):
                 timestamp=fold_train['month_dt']
             )
             
-            # Create a small validation set for early stopping (use last 20% of fold)
-            val_split_idx = int(len(fold_train) * 0.8)
+            # Create a small validation set for early stopping (configurable split ratio)
+            val_split_idx = int(len(fold_train) * FOLD_TRAIN_VAL_SPLIT)
             fold_train_subset = fold_train.iloc[:val_split_idx]
             fold_val_subset = fold_train.iloc[val_split_idx:]
             
@@ -450,7 +456,7 @@ def _(CatBoostClassifier, Pool, SEED, defaultdict, np, pd, train):
             'mean_importance': importance_df.mean(),
             'std_importance': importance_df.std(),
             'cv_importance': importance_df.apply(
-                lambda col: col.std() / col.mean() if col.mean() > 1e-6 else 0.0, axis=0
+                lambda col: col.std() / col.mean() if col.mean() > CV_MIN_MEAN_THRESHOLD else 0.0, axis=0
             ),  # Coefficient of variation with safe division
             'min_importance': importance_df.min(),
             'max_importance': importance_df.max(),
