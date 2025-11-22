@@ -22,7 +22,7 @@ def _():
 
     args = parse(Args)
 
-    SEED = 56
+    SEED = 228
     return CatBoostClassifier, Pool, SEED, args, optuna, pd
 
 
@@ -50,7 +50,7 @@ def _(train):
 
 
 @app.cell
-def _(Pool, test, train_df, val_df):
+def _(Pool, test, train, train_df, val_df):
     train_pool = Pool(
         data=train_df.drop(["a6_flg"], axis=1),
         label=train_df["a6_flg"],
@@ -63,8 +63,14 @@ def _(Pool, test, train_df, val_df):
         cat_features=["product"],
         timestamp=val_df["month_dt"],
     )
+    full_train_pool = Pool(
+        data=train.drop(["a6_flg"], axis=1),
+        label=train["a6_flg"],
+        cat_features=["product"],
+        timestamp=train["month_dt"],
+    )
     test_pool = Pool(data=test, cat_features=["product"], timestamp=test["month_dt"])
-    return test_pool, train_pool, val_pool
+    return full_train_pool, test_pool, train_pool, val_pool
 
 
 @app.cell
@@ -79,7 +85,7 @@ def _(CatBoostClassifier, SEED, train_pool, val_pool):
             "loss_function": trial.suggest_categorical(
                 "loss_function", ["Logloss", "CrossEntropy"]
             ),
-            # УДАЛЕНО: colsample_bylevel - не поддерживается на GPU
+
             "depth": trial.suggest_int("depth", 1, 12),
             "boosting_type": trial.suggest_categorical(
                 "boosting_type", ["Ordered", "Plain"]
@@ -87,18 +93,15 @@ def _(CatBoostClassifier, SEED, train_pool, val_pool):
             "bootstrap_type": trial.suggest_categorical(
                 "bootstrap_type", ["Bayesian", "Bernoulli", "MVS"]
             ),
-            # Основные параметры обучения
+
             "learning_rate": trial.suggest_float("learning_rate", 0.001, 0.3, log=True),
 
-            # Регуляризация
             "l2_leaf_reg": trial.suggest_float("l2_leaf_reg", 1e-9, 15.0, log=True),
             "random_strength": trial.suggest_float("random_strength", 1e-9, 15.0, log=True),
 
-            # Параметры квантизации для GPU
             "border_count": trial.suggest_int("border_count", 32, 255),
         }
 
-        # Bootstrap parameters
         if param["bootstrap_type"] == "Bayesian":
             param["bagging_temperature"] = trial.suggest_float(
                 "bagging_temperature", 0, 20
@@ -106,7 +109,6 @@ def _(CatBoostClassifier, SEED, train_pool, val_pool):
         elif param["bootstrap_type"] == "Bernoulli":
             param["subsample"] = trial.suggest_float("subsample", 0.1, 1)
 
-        # ИСПРАВЛЕНО: auto_class_weights отдельно от loss_function
         if param["loss_function"] == "Logloss":
             param["auto_class_weights"] = trial.suggest_categorical(
                 "auto_class_weights", ["None", "Balanced", "SqrtBalanced"]
@@ -140,16 +142,22 @@ def _(SEED, objective, optuna):
 
 
 @app.cell
-def _(CatBoostClassifier, SEED, study, train_pool, val_pool):
+def _(CatBoostClassifier, SEED, full_train_pool, study, train_pool, val_pool):
     best_params = study.best_params.copy()
 
     best_params.update({"eval_metric": "AUC", "task_type": "GPU", "random_seed": SEED})
 
-    print("Training final model with params:", best_params)
+    print("Training validation model with params:", best_params)
+
+    validation_model = CatBoostClassifier(**best_params)
+
+    validation_model.fit(train_pool, eval_set=val_pool, verbose=100, plot=False)
+
+    print("Retraining on the full dataset for inference")
 
     final_model = CatBoostClassifier(**best_params)
 
-    final_model.fit(train_pool, eval_set=val_pool, verbose=100, plot=False)
+    final_model.fit(full_train_pool, verbose=100, plot=False)
     return (final_model,)
 
 
