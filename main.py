@@ -116,9 +116,12 @@ def _(CatBoostClassifier, train_pool, val_pool):
             "leaf_estimation_backtracking", ["AnyImprovement", "Armijo"]
         )
     
-        param["boosting_type"] = trial.suggest_categorical(
-            "boosting_type", ["Ordered", "Plain"]
-        )
+        if param["grow_policy"] == "Lossguide":
+            param["boosting_type"] = "Plain"
+        else:
+            param["boosting_type"] = trial.suggest_categorical(
+                "boosting_type", ["Ordered", "Plain"]
+            )
     
         param["od_type"] = trial.suggest_categorical("od_type", ["IncToDec", "Iter"])
         param["od_wait"] = trial.suggest_int("od_wait", 10, 50)
