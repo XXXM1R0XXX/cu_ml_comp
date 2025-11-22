@@ -21,7 +21,9 @@ def _():
         ssub_path: str = "data/sample_submission.csv"
 
     args = parse(Args)
-    return CatBoostClassifier, Pool, args, optuna, pd
+
+    SEED = 56
+    return CatBoostClassifier, Pool, SEED, args, optuna, pd
 
 
 @app.cell
@@ -66,12 +68,13 @@ def _(Pool, test, train_df, val_df):
 
 
 @app.cell
-def _(CatBoostClassifier, train_pool, val_pool):
+def _(CatBoostClassifier, SEED, train_pool, val_pool):
     def objective(trial):
         param = {
             "eval_metric": "AUC",
             "task_type": "GPU",
             "verbose": False,
+            "random_seed": SEED,
             "iterations": trial.suggest_int("iterations", 1000, 2000),
             "loss_function": trial.suggest_categorical(
                 "loss_function", ["Logloss", "CrossEntropy"]
@@ -86,11 +89,11 @@ def _(CatBoostClassifier, train_pool, val_pool):
             ),
             # Основные параметры обучения
             "learning_rate": trial.suggest_float("learning_rate", 0.001, 0.3, log=True),
-        
+
             # Регуляризация
             "l2_leaf_reg": trial.suggest_float("l2_leaf_reg", 1e-9, 15.0, log=True),
             "random_strength": trial.suggest_float("random_strength", 1e-9, 15.0, log=True),
-        
+
             # Параметры квантизации для GPU
             "border_count": trial.suggest_int("border_count", 32, 255),
         }
@@ -102,7 +105,7 @@ def _(CatBoostClassifier, train_pool, val_pool):
             )
         elif param["bootstrap_type"] == "Bernoulli":
             param["subsample"] = trial.suggest_float("subsample", 0.1, 1)
-    
+
         # ИСПРАВЛЕНО: auto_class_weights отдельно от loss_function
         if param["loss_function"] == "Logloss":
             param["auto_class_weights"] = trial.suggest_categorical(
@@ -123,8 +126,11 @@ def _(CatBoostClassifier, train_pool, val_pool):
 
 
 @app.cell
-def _(objective, optuna):
-    study = optuna.create_study(direction="maximize")
+def _(SEED, objective, optuna):
+    study = optuna.create_study(
+        direction="maximize",
+        sampler=optuna.samplers.TPESampler(seed=SEED),
+    )
 
     study.optimize(objective, n_trials=50, timeout=600)
 
@@ -134,10 +140,10 @@ def _(objective, optuna):
 
 
 @app.cell
-def _(CatBoostClassifier, study, train_pool, val_pool):
+def _(CatBoostClassifier, SEED, study, train_pool, val_pool):
     best_params = study.best_params.copy()
 
-    best_params.update({"eval_metric": "AUC", "task_type": "GPU", "random_seed": 56})
+    best_params.update({"eval_metric": "AUC", "task_type": "GPU", "random_seed": SEED})
 
     print("Training final model with params:", best_params)
 
