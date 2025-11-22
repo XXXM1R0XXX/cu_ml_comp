@@ -116,7 +116,7 @@ def _(CatBoostClassifier, train_pool, val_pool):
             "leaf_estimation_backtracking", ["AnyImprovement", "Armijo"]
         )
     
-        if param["grow_policy"] == "Lossguide":
+        if param["grow_policy"] in ["Lossguide", "Depthwise"]:
             param["boosting_type"] = "Plain"
         else:
             param["boosting_type"] = trial.suggest_categorical(
