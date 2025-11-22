@@ -67,11 +67,10 @@ def _(Pool, test, train_df, val_df):
 @app.cell
 def _(CatBoostClassifier, train_pool, val_pool):
     def objective(trial):
-        # Определение пространства гиперпараметров
         param = {
             "objective": "Logloss",
             "eval_metric": "AUC",
-            "iterations": 2000,  # Ставим больше, сработает early_stopping
+            "iterations": 2000,
             "learning_rate": trial.suggest_float("learning_rate", 0.005, 0.2, log=True),
             "depth": trial.suggest_int("depth", 4, 10),
             "l2_leaf_reg": trial.suggest_float("l2_leaf_reg", 1e-8, 10.0, log=True),
@@ -88,7 +87,6 @@ def _(CatBoostClassifier, train_pool, val_pool):
             "task_type": "GPU",
         }
 
-        # Условные параметры в зависимости от bootstrap_type
         if param["bootstrap_type"] == "Bayesian":
             param["bagging_temperature"] = trial.suggest_float(
                 "bagging_temperature", 0, 10
@@ -113,7 +111,6 @@ def _(CatBoostClassifier, train_pool, val_pool):
 def _(objective, optuna):
     study = optuna.create_study(direction="maximize")
 
-    # n_trials - количество попыток, timeout - ограничение по времени в секундах
     study.optimize(objective, n_trials=50, timeout=600)
 
     print(f"Best trial found: {study.best_value}")
@@ -125,7 +122,6 @@ def _(objective, optuna):
 def _(CatBoostClassifier, study, train_pool, val_pool):
     best_params = study.best_params.copy()
 
-    # Добавляем статические параметры, которые не перебирали, но нужны для финального обучения
     best_params.update(
         {
             "iterations": 2000,
@@ -133,6 +129,7 @@ def _(CatBoostClassifier, study, train_pool, val_pool):
             "od_type": "Iter",
             "od_wait": 100,
             "allow_writing_files": False,
+            "task_type": "GPU",
         }
     )
 
