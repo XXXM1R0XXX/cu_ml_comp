@@ -18,6 +18,7 @@ def _():
     class Args:
         train_path: str = "data/train.parquet"
         test_path: str = "data/test.parquet"
+        ssub_path: str = "data/sample_submission.csv"
 
     args = parse(Args)
     return CatBoostClassifier, Pool, args, optuna, pd
@@ -142,8 +143,8 @@ def _(CatBoostClassifier, study, train_pool, val_pool):
 
 
 @app.cell
-def _(pd):
-    ss_sub = pd.read_csv("data/sample_submission.csv")
+def _(args, pd):
+    ss_sub = pd.read_csv(args.ssub_path)
     return (ss_sub,)
 
 
