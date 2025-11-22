@@ -80,8 +80,6 @@ def _(CatBoostClassifier, train_pool, val_pool):
         
             "l2_leaf_reg": trial.suggest_float("l2_leaf_reg", 1e-5, 100, log=True),
         
-            "colsample_bylevel": trial.suggest_float("colsample_bylevel", 0.05, 1.0),
-        
             "random_strength": trial.suggest_float("random_strength", 1e-8, 20.0, log=True),
         
             "leaf_estimation_method": trial.suggest_categorical(
