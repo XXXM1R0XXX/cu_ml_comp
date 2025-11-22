@@ -86,7 +86,7 @@ def _(CatBoostClassifier, CatBoostPruningCallback, train_pool, val_pool):
             "od_wait": 50,
             "allow_writing_files": False,
             "verbose": False,
-            # 'task_type': 'GPU'
+            'task_type': 'GPU'
         }
 
         # Условные параметры в зависимости от bootstrap_type
@@ -114,7 +114,6 @@ def _(CatBoostClassifier, CatBoostPruningCallback, train_pool, val_pool):
         pruning_callback.check_pruned()
 
         return model.get_best_score()["validation"]["AUC"]
-
     return (objective,)
 
 
