@@ -90,14 +90,18 @@ def _(CatBoostClassifier, SEED, train_pool, val_pool):
             "random_strength": trial.suggest_float("random_strength", 1e-9, 10.0, log=True),
             "border_count": trial.suggest_int("border_count", 32, 254),
             "min_data_in_leaf": trial.suggest_int("min_data_in_leaf", 1, 100),
-            "grow_policy": trial.suggest_categorical("grow_policy", ["SymmetricTree", "Depthwise", "Lossguide"]),
         }
 
-        if param["grow_policy"] == "SymmetricTree":
+        grow_policy = trial.suggest_categorical("grow_policy", ["SymmetricTree", "Depthwise", "Lossguide"])
+        param["grow_policy"] = grow_policy
+
+        if grow_policy == "SymmetricTree":
             param["depth"] = trial.suggest_int("depth", 2, 10)
-        else:
+        elif grow_policy == "Depthwise":
             param["depth"] = trial.suggest_int("depth", 4, 12)
+        elif grow_policy == "Lossguide":
             param["max_leaves"] = trial.suggest_int("max_leaves", 16, 64)
+            param["depth"] = trial.suggest_int("depth", 4, 12)
 
         bootstrap_type = trial.suggest_categorical("bootstrap_type", ["Bayesian", "Bernoulli"])
         param["bootstrap_type"] = bootstrap_type
