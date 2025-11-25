@@ -19,6 +19,7 @@ def _():
         train_path: str = "data/train.parquet"
         test_path: str = "data/test.parquet"
         ssub_path: str = "data/sample_submission.csv"
+        sub_path: str = "submission.csv"
 
     args = parse(Args)
 
@@ -148,14 +149,6 @@ def _(CatBoostClassifier, SEED, full_train_pool, study):
 
     best_params.update({"eval_metric": "AUC", "task_type": "GPU", "random_seed": SEED})
 
-    # print("Training validation model with params:", best_params)
-
-    # validation_model = CatBoostClassifier(**best_params)
-
-    # validation_model.fit(train_pool, eval_set=val_pool, verbose=100, plot=False)
-
-    print("Retraining on the full dataset for inference")
-
     final_model = CatBoostClassifier(**best_params)
 
     final_model.fit(full_train_pool, verbose=100, plot=False)
@@ -175,8 +168,8 @@ def _(final_model, ss_sub, test_pool):
 
 
 @app.cell
-def _(ss_sub):
-    ss_sub.to_csv("submission.csv", index=False)
+def _(args, ss_sub):
+    ss_sub.to_csv(args.sub_path, index=False)
     return
 
 
